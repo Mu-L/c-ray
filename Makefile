@@ -3,7 +3,15 @@ CC?=cc
 -include ccache.mk
 OPT?=-O2
 CFLAGS=-I./include/ -I./src/ -Wall -Wextra -Wpedantic -Wno-missing-field-initializers -std=c99 -D_POSIX_C_SOURCE=200112L $(OPT) -g -ftree-vectorize
-LDLIBS=-lpthread -lm -ldl
+
+ifdef STATIC
+LDLIBS=-static
+CFLAGS += -DSTATICALLY_LINKED=1
+else
+CFLAGS += -DSTATICALLY_LINKED=0
+endif
+
+LDLIBS += -lpthread -lm -ldl
 
 BINDIR=bin
 OBJDIR=$(BINDIR)/obj

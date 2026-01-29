@@ -143,7 +143,7 @@ int main(int argc, char *argv[]) {
 	atexit(term_restore);
 	if (signal(SIGINT, s_sigint_init) == SIG_ERR)
 		logr(error, "signal(SIGINT, s_sigint_init) == SIG_ERR: %s", strerror(errno));
-	logr(info, "c-ray v%s [%.8s], © 2015-2025 Valtteri Koskivuori\n", cr_get_version(), cr_get_git_hash());
+	logr(info, "c-ray v%s [%.8s]%s, © 2015-2026 Valtteri Koskivuori\n", cr_get_version(), cr_get_git_hash(), STATICALLY_LINKED ? " (static)" : "");
 
 	struct driver_args *opts = args_parse(argc, argv);
 	char *log_level = args_string(opts, "log_level");
@@ -267,7 +267,7 @@ int main(int argc, char *argv[]) {
 	};
 
 	const cJSON *display = cJSON_GetObjectItem(input_json, "display");
-	if (!args_is_set(opts, "no_sdl") && display && !cJSON_IsFalse(cJSON_GetObjectItem(display, "enabled")))
+	if (!STATICALLY_LINKED && !args_is_set(opts, "no_sdl") && display && !cJSON_IsFalse(cJSON_GetObjectItem(display, "enabled")))
 		cr_renderer_set_callback(renderer, cr_cb_on_start, on_start, &usrdata);
 
 	cr_renderer_set_callback(renderer, cr_cb_on_stop, on_stop, &usrdata);

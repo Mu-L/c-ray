@@ -106,10 +106,7 @@ static void *thread_stub(void *arg) {
 // Nonblocking function to make python happy, just shove the normal loop in a
 // background thread.
 void renderer_start_interactive(struct renderer *r) {
-	v_thread_create((v_thread_ctx){
-		.thread_fn = thread_stub,
-		.ctx = r
-	}, v_thread_type_detached);
+	v_thread_spawn(thread_stub, r, v_thread_type_detached);
 }
 
 void update_toplevel_bvh(struct world *s) {
@@ -241,9 +238,7 @@ void renderer_render(struct renderer *r) {
 			.renderer = r,
 			.buf = result,
 			.cam = camera,
-			.thread_ctx = {
-				.thread_fn = local_render_thread,
-			}
+			.thread_fn = local_render_thread,
 		});
 	}
 	for (size_t c = 0; c < v_arr_len(r->state.clients); ++c) {
@@ -252,17 +247,14 @@ void renderer_render(struct renderer *r) {
 			.renderer = r,
 			.buf = result,
 			.cam = camera,
-			.thread_ctx = {
-				.thread_fn = client_connection_thread
-			}
+			.thread_fn = client_connection_thread
 		});
 	}
 	bool threads_not_supported = false;
 	for (size_t w = 0; w < v_arr_len(r->state.workers); ++w) {
 		struct worker *worker = &r->state.workers[w];
-		worker->thread_ctx.ctx = &r->state.workers[w];
 		worker->tiles = &set;
-		worker->thread = v_thread_create(worker->thread_ctx, v_thread_type_joinable);
+		worker->thread = v_thread_spawn(worker->thread_fn, worker, v_thread_type_joinable);
 		if (!worker->thread) {
 			threads_not_supported = true;
 			break;
@@ -271,9 +263,9 @@ void renderer_render(struct renderer *r) {
 
 	if (threads_not_supported) {
 		struct worker *w = &r->state.workers[0];
-		w->thread_ctx.thread_fn = render_single_iteration;
+		w->thread_fn = render_single_iteration;
 		while (r->state.s == r_rendering) {
-			w->thread_ctx.thread_fn(w->thread_ctx.ctx);
+			w->thread_fn(w);
 			if (w->thread_complete)
 				break;
 			struct callback status = r->state.callbacks[cr_cb_status_update];
@@ -310,7 +302,7 @@ void renderer_render(struct renderer *r) {
 
 	//Make sure render threads are terminated before continuing (This blocks)
 	for (size_t w = 0; !threads_not_supported && w < v_arr_len(r->state.workers); ++w)
-		v_thread_wait_and_destroy(r->state.workers[w].thread);
+		v_thread_wait(r->state.workers[w].thread);
 
 	struct callback stop = r->state.callbacks[cr_cb_on_stop];
 	if (stop.fn) {

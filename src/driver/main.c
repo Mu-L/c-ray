@@ -78,13 +78,8 @@ static void on_start(struct cr_renderer_cb_info *cb_info, void *user_data) {
 	// Solution is to init SDL2 synchronously on macOS.
 	win_init_task(d);;
 #else
-	v_thread_ctx ctx = {
-		.thread_fn = win_init_task,
-		.ctx = d,
-	};
-	v_thread *ret = v_thread_create(ctx, v_thread_type_detached);
-	if (!ret) // Fall back to running synchronously.
-		win_init_task(d);
+	if (!v_thread_spawn(win_init_task, d, v_thread_type_detached))
+		win_init_task(d); // Fall back to running synchronously.
 #endif
 }
 

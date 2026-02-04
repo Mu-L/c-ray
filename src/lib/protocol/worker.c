@@ -207,8 +207,8 @@ static cJSON *startRender(int connectionSocket, size_t thread_limit) {
 	logr(info, "Starting network render job\n");
 	
 	size_t threadCount = thread_limit ? thread_limit : g_worker_renderer->prefs.threads;
-	v_thread **worker_threads = calloc(threadCount, sizeof(*worker_threads));
-	struct workerThreadState *workerThreadStates = calloc(threadCount, sizeof(*workerThreadStates));
+	v_thread **worker_threads = NULL;
+	struct workerThreadState *workerThreadStates = NULL;
 	
 	struct camera selected_cam = g_worker_renderer->scene->cameras[g_worker_renderer->prefs.selected_camera];
 	if (g_worker_renderer->prefs.override_width && g_worker_renderer->prefs.override_height) {
@@ -246,29 +246,27 @@ static cJSON *startRender(int connectionSocket, size_t thread_limit) {
 	for (size_t i = 0; i < v_arr_len(set.tiles); ++i)
 		set.tiles[i].total_samples = r->prefs.sampleCount;
 
-	//Print a useful warning to user if the defined tile size results in less renderThreads
+	// Print a useful warning to user if the defined tile size results in less renderThreads
 	if (v_arr_len(set.tiles) < r->prefs.threads) {
 		logr(warning, "WARNING: Rendering with a less than optimal thread count due to large tile size!\n");
 		logr(warning, "Reducing thread count from %zu to %zu\n", r->prefs.threads, v_arr_len(set.tiles));
 		r->prefs.threads = v_arr_len(set.tiles);
 	}
 
-	//Create render threads (Nonblocking)
+	// Create render threads
 	for (size_t t = 0; t < threadCount; ++t) {
-		workerThreadStates[t] = (struct workerThreadState){
-				.thread_num = t,
-				.connectionSocket = connectionSocket,
-				.socketMutex = g_worker_socket_mutex,
-				.renderer = g_worker_renderer,
-				.tiles = &set,
-				.cam = &selected_cam};
-		v_thread_ctx ctx = {
-			.thread_fn = workerThread,
-			.ctx = &workerThreadStates[t],
-		};
-		worker_threads[t] = v_thread_create(ctx, v_thread_type_joinable);
-		if (!worker_threads[t])
+		size_t state_idx = v_arr_add(workerThreadStates, (struct workerThreadState){
+			.thread_num = t,
+			.connectionSocket = connectionSocket,
+			.socketMutex = g_worker_socket_mutex,
+			.renderer = g_worker_renderer,
+			.tiles = &set,
+			.cam = &selected_cam
+		});
+		v_thread *t = v_thread_spawn(workerThread, &workerThreadStates[state_idx], v_thread_type_joinable);
+		if (!t)
 			logr(error, "Failed to create a v_thread.\n");
+		v_arr_add(worker_threads, t);
 	}
 	
 	int pauser = 0;
@@ -308,7 +306,7 @@ static cJSON *startRender(int connectionSocket, size_t thread_limit) {
 
 	//Make sure workder threads are terminated before continuing (This blocks)
 	for (size_t t = 0; t < threadCount; ++t) {
-		v_thread_wait_and_destroy(worker_threads[t]);
+		v_thread_wait(worker_threads[t]);
 	}
 	tile_set_free(&set);
 	free(worker_threads);

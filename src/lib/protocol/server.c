@@ -398,28 +398,25 @@ struct render_client *clients_sync(const struct renderer *r) {
 		});
 	}
 
-	// TODO: v_arr
-	v_thread **sync_threads = calloc(v_arr_len(clients), sizeof(*sync_threads));
-
-	for (size_t i = 0; i < v_arr_len(clients); ++i) {
-		v_thread_ctx ctx = {
-			.thread_fn = client_sync_thread,
-			.ctx = &params[i],
-		};
-		sync_threads[i] = v_thread_create(ctx, v_thread_type_joinable);
-		if (!sync_threads[i]) {
+	v_thread **sync_threads = NULL;
+	for (size_t i = 0; i < v_arr_len(params); ++i) {
+		v_thread *t = v_thread_spawn(client_sync_thread, &params[i], v_thread_type_joinable);
+		if (!t) {
 			logr(warning, "Something went wrong while starting the sync thread for client %i. May want to look into that.\n", (int)i);
+			continue;
 		}
+		v_arr_add(sync_threads, t);
 	}
 	
 	size_t loops = 0;
 	while (true) {
 		bool all_stopped = true;
-		for (size_t i = 0; i < v_arr_len(clients); ++i) {
+		for (size_t i = 0; i < v_arr_len(params); ++i) {
 			if (!params[i].done)
 				all_stopped = false;
 		}
-		if (all_stopped) break;
+		if (all_stopped)
+			break;
 		v_timer_sleep_ms(10);
 		if (++loops == 10) {
 			loops = 0;
@@ -429,15 +426,15 @@ struct render_client *clients_sync(const struct renderer *r) {
 	}
 	
 	// Block here and verify threads are done before continuing.
-	for (size_t i = 0; i < v_arr_len(clients); ++i)
-		v_thread_wait_and_destroy(sync_threads[i]);
+	for (size_t i = 0; i < v_arr_len(sync_threads); ++i)
+		v_thread_wait(sync_threads[i]);
 
-	for (size_t i = 0; i < v_arr_len(clients); ++i)
+	for (size_t i = 0; i < v_arr_len(params); ++i)
 		printf("\n");
 	logr(info, "Client sync finished.\n");
 
 	free(serialized);
-	free(sync_threads);
+	v_arr_free(sync_threads);
 	v_arr_free(params);
 	return clients;
 }

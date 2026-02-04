@@ -14,7 +14,7 @@
 #include <protocol/server.h>
 
 struct worker {
-	v_thread_ctx thread_ctx;
+	void *(*thread_fn)(void *);
 	v_thread *thread;
 	bool thread_complete;
 	

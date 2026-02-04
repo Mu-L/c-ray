@@ -263,7 +263,10 @@ struct sdl_window *win_try_init(const struct cr_bitmap **buf) {
 	w->sdl2 = syms;
 	w->rbuf = buf;
 
-	finalize(w);
+	if (finalize(w)) {
+		logr(warning, "SDL finalize failed\n");
+		goto fail_calloc;
+	}
 
 	return w;
 fail_calloc:

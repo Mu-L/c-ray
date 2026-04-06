@@ -93,6 +93,8 @@ add_executable(c-ray
 	src/driver/main.c
 )
 
+target_compile_definitions(c-ray PRIVATE STATICALLY_LINKED=0)
+
 foreach(x IN ITEMS lib driver common c-ray)
 	target_include_directories(${x} PRIVATE ${CMAKE_SOURCE_DIR}/include)
 	target_include_directories(${x} PRIVATE ${CMAKE_SOURCE_DIR}/src)

@@ -20,6 +20,9 @@ lib: $(BIN_lib)
 
 pylib: bindings/python/lib/cray_wrap.so
 
+repl: pylib
+	@PYTHONPATH=$(CURDIR) python3 -i scripts/repl.py
+
 BLENDER_VERSION=$(shell blender --version | head -n1 | cut -d ' ' -f 2 | cut -c 1-3)
 BLENDER_ROOT=$(HOME)/.config/blender/$(BLENDER_VERSION)
 
